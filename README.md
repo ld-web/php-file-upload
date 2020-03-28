@@ -160,3 +160,113 @@ Le code d'erreur correspond au fait que la limite maximale d'upload de fichiers 
 Vous pouvez retrouver la liste des codes d'erreur et les constantes associées sur [cette page](https://www.php.net/manual/fr/features.file-upload.errors.php).
 
 Adaptez finalement le paramètre `upload_max_filesize`, à `980M` également, par exemple, puis retentez l'expérience. Normalement tout fonctionne et le code d'erreur est bien 0.
+
+## Enregistrement d'un fichier sur le serveur
+
+Rappelons le processus : un client nous envoie un fichier (qui peut être un fichier image) et nous souhaitons le stocker sur notre serveur.
+
+### Zone de transit
+
+Lorsqu'un fichier est correctement mappé dans le tableau `$_FILES`, donc sans erreurs, avant de pouvoir l'enregistrer où on le souhaite, il est déposé automatiquement dans une zone temporaire. On peut savoir où il est déposé grâce à la valeur de la clé `tmp_name`.
+
+> L'idée va donc être la suivante : si on veut valider l'upload du fichier, alors on va copier le fichier déposé dans le dossier temporaire vers notre destination
+
+### Enregistrement du fichier sur le serveur
+
+Pour récupérer notre fichier, on peut vérifier l'existence de la clé correspondant à notre nom d'input dans le tableau `$_FILES`.
+
+Ensuite, on va effectuer ce qu'on veut avec, puis l'enregistrer avec la méthode `move_uploaded_file` si tout va bien :
+
+```php
+if (isset($_FILES['myFile'])) {
+  // on met le fichier dans une variable pour une meilleure lisibilité
+  $file = $_FILES['myFile'];
+
+  // On récupère le nom du fichier
+  $filename = $file['name'];
+
+  // On construit le chemin de destination
+  $destination = __DIR__ . "/img/" . $filename;
+
+  // On bouge le fichier temporaire dans la destination
+  if (move_uploaded_file($file['tmp_name'], $destination)) {
+    echo $filename . " correctement enregistré<br />";
+  }
+}
+```
+
+Remarquez bien que c'est au moment de faire notre `move_uploaded_file` qu'on déplace notre fichier temporaire vers notre destination. Par ailleurs, on spécifie le chemin complet, nom du fichier inclus, dans la destination !
+
+> Note : vous pouvez également utiliser la fonction `is_uploaded_file` si vous souhaitez simplement vérifier que le fichier a bien été uploadé avec la méthode HTTP POST, mais sans confirmer l'upload et déplacer comme le fait `move_uploaded_file`. Dans ce cas, essayez de garder en tête qu'**il faut transmettre à `is_uploaded_file` le chemin vers le fichier temporaire**
+>
+> Note : Ici on enregistre notre fichier dans un dossier '/img/'. Ce dossier doit exister avant ! La fonction `move_uploaded_file` ne crée pas le dossier pour nous
+
+### Enregistrer plusieurs fichiers en même temps
+
+Vous pouvez utiliser l'attribut `multiple` sur la balise `input type="file"` :
+
+```html
+<form method="POST" enctype="multipart/form-data">
+  <!-- Notez bien les [] après photos pour en faire un tableau ! -->
+  <input type="file" name="photos[]" multiple />
+  <input type="submit" value="Envoyer" />
+</form>
+```
+
+Ensuite, côté serveur, comment reçoit-il les données ?
+
+```txt
+array (size=1)
+  'photos' =>
+    array (size=5)
+      'name' =>
+        array (size=4)
+          0 => string '30689022_2173861462844244_9173788516323164160_n.png' (length=51)
+          1 => string '32390643_1790587770979334_7307382856911683584_o.jpg' (length=51)
+          2 => string '52845255_2178439338860840_991282794128736256_o.jpg' (length=50)
+          3 => string '53155175_2014283698871580_6028573627476082688_n.jpg' (length=51)
+      'type' =>
+        array (size=4)
+          0 => string 'image/png' (length=9)
+          1 => string 'image/jpeg' (length=10)
+          2 => string 'image/jpeg' (length=10)
+          3 => string 'image/jpeg' (length=10)
+      'tmp_name' =>
+        array (size=4)
+          0 => string 'C:\wamp64\tmp\php4688.tmp' (length=25)
+          1 => string 'C:\wamp64\tmp\php4689.tmp' (length=25)
+          2 => string 'C:\wamp64\tmp\php468A.tmp' (length=25)
+          3 => string 'C:\wamp64\tmp\php468B.tmp' (length=25)
+      'error' =>
+        array (size=4)
+          0 => int 0
+          1 => int 0
+          2 => int 0
+          3 => int 0
+      'size' =>
+        array (size=4)
+          0 => int 106078
+          1 => int 223761
+          2 => int 157184
+          3 => int 73876
+```
+
+Vous voyez ici le comportement de PHP : il garde un seul index `photos`, et traite chaque photo comme un nouvel élément de `name`, `size`, etc...! Il va donc falloir boucler sur un de ces tableaux !
+
+Le tableau `error` paraît tout indiqué, pour pouvoir vérifier pour chaque fichier si tout s'est bien passé :
+
+```php
+if (isset($_FILES['photos'])) {
+  foreach ($_FILES['photos']['error'] as $key => $error) {
+    if ($error == UPLOAD_ERR_OK) {
+      $tmp_name = $_FILES["photos"]["tmp_name"][$key];
+      $filename = $_FILES["photos"]["name"][$key];
+      $destination = __DIR__ . "/img/" . $filename;
+
+      if (move_uploaded_file($tmp_name, $destination)) {
+        echo $filename . " correctement enregistré<br />";
+      }
+    }
+  }
+}
+```
