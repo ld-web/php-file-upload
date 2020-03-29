@@ -270,3 +270,35 @@ if (isset($_FILES['photos'])) {
   }
 }
 ```
+
+## Lien avec une base de données
+
+Après avoir vu comment enregistrer un fichier sur le serveur, l'idée serait de pouvoir par exemple enregistrer une photo de profil, puis l'afficher quand on en a besoin.
+
+On a donc besoin de persister de la donnée afin de la restituer plus tard.
+
+Concernant le fichier en lui-même, le problème semble réglé : on a déjà vu comment stocker le fichier sur le serveur.
+
+Mais qu'en est-il de l'information qu'on souhaite restituer ?
+
+Par exemple, une photo de profil. Elle va certainement se situer dans une table `users`, dans un champ `profilePic` ?
+
+### Stockez dans votre champ de base de données le nom du fichier
+
+Ce qu'il faut retenir, c'est qu'un fichier va avoir un cycle de vie dans votre application :
+
+- Un utilisateur tente d'uploader un fichier. Après avoir passé les contrôles de tailles, éventuellement de types MIME si vous souhaitez vérifier dans votre code qu'il s'agit bien d'une image, etc...on va l'enregistrer physiquement dans le dossier /A/B/photo.png
+
+> Pour mieux organiser notre code, on va séparer le chemin initial (/A/B), qui peut être amené à changer à l'avenir, du nom de fichier (photo.png)
+
+- En base de données, on va donc enregistrer `photo.png`, et pas le chemin complet du fichier. Si l'endroit où on veut stocker les photo des utilisateurs change, alors on pourra le changer dans notre code, sans avoir besoin de mettre à jour toute notre base de données
+
+- Plus tard, l'utilisateur veut afficher une page dans laquelle il faut afficher de nouveau cette photo. Alors depuis l'enregistrement récupéré de la base de données, nous sommes capables de reconstruire le chemin complet pour accéder à la photo. On va injecter dans l'attribut `src` de la balise `img` le chemin complet !
+
+- Enfin, si l'image doit être changée ou supprimée, nous sommes toujours capables de reconstuire le chemin pour y accéder
+
+Vous trouverez dans la partie PDO du dépôt qu'on faisait en cours l'addition de l'upload de fichiers pour un utilisateur !
+
+Le commit avec la liste des fichiers modifiés se trouve à cette adresse : [cliquez ici](https://github.com/ld-web/ynov-b1-php-intro/commit/eef1781ebc0b6aaf20ef9e585bfe8621f2b3739f).
+
+N'hésitez pas à pull les modifications pour les analyser dans vos fichiers.
